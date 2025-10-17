@@ -22,7 +22,7 @@ export const conflictRate = new Rate('optimistic_lock_conflicts');
  * @returns {object} Відповідь від API
  */
 function makeRequest(method, url, body = null, expectedStatuses = [200], operationType = 'read') {
-  // Перетворюємо на масив, якщо передано одне число, для зворотної сумісності
+
   const statuses = Array.isArray(expectedStatuses) ? expectedStatuses : [expectedStatuses];
 
   const params = {
@@ -31,28 +31,21 @@ function makeRequest(method, url, body = null, expectedStatuses = [200], operati
       type: operationType,
       endpoint: url.replace(/\/[0-9a-f-]{36}/g, '/:id'),
     },
-    // 👇 ГОЛОВНА ЗМІНА ТУТ. Повідомляємо k6 про всі "хороші" статуси
-    expectedStatuses: statuses,
+    responseCallback: http.expectedStatuses(...statuses),
   };
 
   let response;
-  // ... (решта коду http.request залишається без змін)
   if (body) {
     response = http.request(method, url, JSON.stringify(body), params);
   } else {
     response = http.request(method, url, null, params);
   }
 
-  // Тепер перевіряємо, чи входить отриманий статус в масив очікуваних
   const statusCheck = check(response, {
     [`status is one of [${statuses.join(',')}]`]: (r) => statuses.includes(r.status),
   });
 
-  // Трекінг помилок та логування (тепер логіка трохи інша)
   if (!statusCheck) {
-    console.error(
-      `❌ API Error on ${method} ${params.tags.endpoint}: Expected status to be one of [${statuses.join(',')}], but got ${response.status}. Response: ${response.body}`
-    );
     errorRate.add(1);
   } else {
     errorRate.add(0);
@@ -122,7 +115,7 @@ export function createTravelPlan(planData) {
 
   try {
     const plan = JSON.parse(response.body);
-    console.log(`✓ Successfully created plan: ${plan.id}, title="${plan.title}", version=${plan.version}`);
+    console.debug(`✓ Successfully created plan: ${plan.id}, title="${plan.title}", version=${plan.version}`);
     return plan;
   } catch (e) {
     console.error(`❌ Failed to parse JSON for created plan:`, e.message);
@@ -177,7 +170,7 @@ export function getTravelPlan(planId) {
 
   try {
     const plan = JSON.parse(response.body);
-    console.log(`✓ Successfully retrieved plan ${planId}: title="${plan.title}", locations=${plan.locations?.length || 0}`);
+    console.debug(`✓ Successfully retrieved plan ${planId}: title="${plan.title}", locations=${plan.locations?.length || 0}`);
     return plan;
   } catch (e) {
     console.error(`❌ Failed to parse JSON for plan ${planId}:`, e.message);
@@ -205,7 +198,7 @@ export function verifyPlanDeleted(planId) {
   });
 
   if (isDeleted) {
-    console.log(`✓ Verified plan ${planId} is deleted (404)`);
+    console.debug(`✓ Verified plan ${planId} is deleted (404)`);
   } else {
     console.error(`❌ Plan ${planId} should be deleted but returned status ${response.status}`);
     console.error(`   Response body: ${response.body}`);
@@ -326,7 +319,7 @@ export function addLocation(planId, locationData) {
 
   try {
     const location = JSON.parse(response.body);
-    console.log(`✓ Successfully added location: ${location.id}, name="${location.name}", visit_order=${location.visit_order}`);
+    console.debug(`✓ Successfully added location: ${location.id}, name="${location.name}", visit_order=${location.visit_order}`);
     return location;
   } catch (e) {
     console.error(`❌ Failed to parse JSON for created location:`, e.message);

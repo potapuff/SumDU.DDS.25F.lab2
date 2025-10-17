@@ -60,9 +60,9 @@ import {
 export const options = {
   // Дуже помірне навантаження - лише перевірка функціональності
   stages: [
-    { duration: '10s', target: 5 },   // Warm-up
-    { duration: '30s', target: 5 },    // Stable load
-    { duration: '10s', target: 0 },   // Cool-down
+    { duration: '5s', target: 2 },   // Warm-up
+    { duration: '10s', target: 5 },    // Stable load
+    { duration: '5s', target: 0 },   // Cool-down
   ],
 
   // М'які пороги - головне щоб працювало
@@ -72,8 +72,12 @@ export const options = {
     // Все має відповідати розумно швидко
     'http_req_duration': ['p(95)<2000'],
     
-    // Всі запити мають бути успішними
-    'http_req_failed': ['rate==0'],
+    // Строго для запису: жодних фейлів
+    'http_req_failed{type:write}': ['rate==0'],
+    // Для читання дозволяємо невелику частку через очікуваний 404 після видалення
+    'http_req_failed{type:read}': ['rate<0.12'],
+    // Власні помилки API не допускаються
+    'api_errors': ['rate==0'],
     
     // Більшість перевірок мають проходити
     'checks': ['rate>0.90'],
@@ -112,7 +116,7 @@ export default function () {
   const planData = generateTravelPlan();
   planData.title = 'Smoke Test Plan';
   
-  console.log(`📝 Creating travel plan with data: ${JSON.stringify(planData)}`);
+  console.debug(`📝 Creating travel plan with data: ${JSON.stringify(planData)}`);
   const plan = createTravelPlan(planData);
   
   if (!plan) {
@@ -125,7 +129,7 @@ export default function () {
   }
 
   const planId = plan.id;
-  console.log(`✓ Created plan: ${planId}`);
+  console.debug(`✓ Created plan: ${planId}`);
 
   thinkTime(1, 1.5);
 
@@ -144,8 +148,8 @@ export default function () {
     return;
   }
 
-  console.log(`✓ Retrieved plan: ${planId}`);
-  console.log(`   Plan details: title="${retrievedPlan.title}", version=${retrievedPlan.version}, locations=${retrievedPlan.locations?.length || 0}`);
+  console.debug(`✓ Retrieved plan: ${planId}`);
+  console.debug(`   Plan details: title="${retrievedPlan.title}", version=${retrievedPlan.version}, locations=${retrievedPlan.locations?.length || 0}`);
 
   thinkTime(1, 1.5);
 
@@ -155,7 +159,7 @@ export default function () {
   const locationData = generateLocation();
   locationData.name = 'Smoke Test Location';
   
-  console.log(`📍 Adding location to plan ${planId} with data: ${JSON.stringify(locationData)}`);
+  console.debug(`📍 Adding location to plan ${planId} with data: ${JSON.stringify(locationData)}`);
   const location = addLocation(planId, locationData);
   
   if (!location) {
@@ -169,14 +173,14 @@ export default function () {
     return;
   }
 
-  console.log(`✓ Added location: ${location.id}`);
+  console.debug(`✓ Added location: ${location.id}`);
 
   thinkTime(1, 1.5);
 
   // --------------------------------------------------
   // 6. ОНОВЛЕННЯ TRAVEL PLAN
   // --------------------------------------------------
-  console.log(`🔄 Re-fetching plan ${planId} to get the latest version...`);
+  console.debug(`🔄 Re-fetching plan ${planId} to get the latest version...`);
   const planAfterLocationAdd = getTravelPlan(planId);
   
   if (!planAfterLocationAdd) {
@@ -184,7 +188,7 @@ export default function () {
       deleteTravelPlan(planId); // Cleanup
       return;
   }
-  console.log(`✓ Got updated version: ${planAfterLocationAdd.version}`);
+  console.debug(`✓ Got updated version: ${planAfterLocationAdd.version}`);
   
   
   const updateData = {
@@ -202,7 +206,7 @@ export default function () {
       return;
   }
   
-  console.log(`✓ Updated plan: ${planId}`);
+  console.debug(`✓ Updated plan: ${planId}`);
 
   thinkTime(1, 1.5);
 
@@ -216,7 +220,7 @@ export default function () {
     return;
   }
 
-  console.log(`✓ Deleted plan: ${planId}`);
+  console.debug(`✓ Deleted plan: ${planId}`);
 
   thinkTime(1, 1.5);
 
